@@ -196,15 +196,23 @@ export const lookupCatalog = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<LinkedReading[]> => {
     const results = await Promise.all(
       data.readings.map(async (reading, index): Promise<LinkedReading> => {
+        const isBookish = reading.type === "book" || reading.type === "chapter";
         let match: CatalogMatch | null = null;
         try {
-          match =
-            reading.type === "book" || reading.type === "chapter"
-              ? ((await lookupBook(reading)) ?? (await lookupArticle(reading)))
-              : ((await lookupArticle(reading)) ?? (await lookupBook(reading)));
-        } catch {
+          if (reading.doi) {
+            match = await lookupArticle(reading);
+          } else if (isBookish) {
+            // Never fall back to Crossref for a book: it matches book reviews.
+            match = await lookupBook(reading);
+          } else {
+            match = (await lookupArticle(reading)) ?? (await lookupBook(reading));
+          }
+        } catch (e) {
+          console.error("catalog lookup failed", reading.title, e);
           match = null;
         }
+        console.log("lookup", reading.type, reading.title, "->", match?.status ?? "none");
+
 
         return {
           ...reading,
