@@ -170,10 +170,20 @@ async function lookupBook(reading: Reading): Promise<CatalogMatch | null> {
   const doc = json?.docs?.[0];
   if (!doc?.title) return null;
 
-  const titleMatch = String(doc.title)
-    .toLowerCase()
-    .includes(reading.title.toLowerCase().slice(0, 12));
-  if (!titleMatch) return null;
+  // Catalog records are often in the original language, so accept the top hit
+  // when either the title or the author lines up.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ");
+  const stop = new Set(["the", "a", "an", "of", "and", "in", "on", "to", "for"]);
+  const words = new Set(norm(reading.title).split(/\s+/).filter((w) => w.length > 3 && !stop.has(w)));
+  const docTitle = norm(String(doc.title));
+  const titleMatch = [...words].some((w) => docTitle.includes(w));
+  const surnames = norm(reading.authors ?? "")
+    .split(/\s+/)
+    .filter((w) => w.length > 3);
+  const docAuthors = norm((doc.author_name ?? []).join(" "));
+  const authorMatch = surnames.some((s) => docAuthors.includes(s));
+  if (!titleMatch && !authorMatch) return null;
+
 
   const readable = doc.ebook_access === "public" || doc.ebook_access === "borrowable";
   const year = doc.first_publish_year ? ` (${doc.first_publish_year})` : "";
