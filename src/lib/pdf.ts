@@ -1,9 +1,6 @@
 // Browser-side PDF reading. Pulls the text layer, and falls back to page
 // images (for scanned syllabi) so the AI can read them visually.
-import * as pdfjs from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+// Everything is imported lazily so pdf.js never runs during SSR.
 
 export type SyllabusExtraction = {
   text: string;
@@ -12,10 +9,20 @@ export type SyllabusExtraction = {
   pages: number;
 };
 
+async function loadPdfjs() {
+  const [pdfjs, worker] = await Promise.all([
+    import("pdfjs-dist"),
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+  ]);
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  return pdfjs;
+}
+
 export async function extractSyllabus(
   file: File,
   onProgress?: (message: string) => void,
 ): Promise<SyllabusExtraction> {
+  const pdfjs = await loadPdfjs();
   const data = new Uint8Array(await file.arrayBuffer());
   const pdf = await pdfjs.getDocument({ data }).promise;
   const pages = pdf.numPages;
