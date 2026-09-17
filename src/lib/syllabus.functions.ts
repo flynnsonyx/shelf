@@ -112,13 +112,23 @@ function callNumber(seed: string, subject?: string) {
 
 async function safeJson(url: string) {
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `Shelfmark/1.0 (${MAILTO})`,
+      },
+    });
+    if (!res.ok) {
+      console.error("catalog request failed", res.status, url);
+      return null;
+    }
     return (await res.json()) as any;
-  } catch {
+  } catch (e) {
+    console.error("catalog request errored", url, e);
     return null;
   }
 }
+
 
 async function lookupArticle(reading: Reading): Promise<CatalogMatch | null> {
   const doi = reading.doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//, "").trim();
